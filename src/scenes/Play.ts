@@ -7,7 +7,7 @@ export default class Play extends Phaser.Scene {
   left?: Phaser.Input.Keyboard.Key;
   right?: Phaser.Input.Keyboard.Key;
   movement?: boolean;
-  enemyCount?: number;
+  enemies?: Enemy[];
 
   starfield?: Phaser.GameObjects.TileSprite;
   spinner?: Phaser.GameObjects.Shape;
@@ -33,7 +33,7 @@ export default class Play extends Phaser.Scene {
     this.left = this.#addKey("LEFT");
     this.right = this.#addKey("RIGHT");
     this.movement = true;
-    this.enemyCount = 0;
+    this.enemies = [];
 
     this.starfield = this.add
       .tileSprite(
@@ -46,14 +46,29 @@ export default class Play extends Phaser.Scene {
       .setOrigin(0, 0);
 
     this.spinner = this.add.rectangle(100, 400, 50, 50, 0x00f1d0);
+    this.physics.add.existing(this.spinner);
   }
 
   update(_timeMs: number, delta: number) {
     this.starfield!.tilePositionX -= 4;
-    if (this.enemyCount! < 4) {
-      const bruh = new Enemy(this, 50, 50);
-      bruh.update(_timeMs, delta);
+    if (this.enemies!.length < 4) {
+      this.enemies!.push(
+        new Enemy(this, Math.random() * -200, Math.random() * 200),
+      );
+      console.log(this.enemies);
     }
+
+    this.enemies!.forEach((enemy) => {
+      enemy.update(_timeMs, delta);
+      this.physics.collide(this.spinner!, enemy.rect, () => {
+        enemy.rect!.destroy();
+        this.enemies!.splice(this.enemies!.indexOf(enemy), 1);
+      });
+      if (enemy.rect!.x > 600) {
+        enemy.rect!.destroy();
+        this.enemies!.splice(this.enemies!.indexOf(enemy), 1);
+      }
+    });
 
     if (this.left!.isDown && this.movement) {
       this.spinner!.rotation -= delta * this.rotationSpeed;
@@ -64,41 +79,36 @@ export default class Play extends Phaser.Scene {
       this.spinner!.x += delta * 0.5;
     }
 
-    if (this.fire!.isDown) {
+    if (this.fire!.isDown && this.movement) {
       this.movement = false;
       this.tweens.add({
         targets: this.spinner,
         scale: { from: 1.5, to: 1 },
-        duration: 300,
-        ease: Phaser.Math.Easing.Sine.Out,
-      });
-      this.tweens.add({
-        targets: this.spinner,
         y: { from: 400, to: -20 },
-        duration: 1000,
-        ease: Phaser.Math.Easing.Linear,
+        duration: 300,
         onComplete: () => {
           this.spinner!.y = 400;
           this.time.delayedCall(100, () => {
             this.movement = true;
           });
         },
+        ease: Phaser.Math.Easing.Sine.Out,
       });
     }
   }
 }
 
 class Enemy {
-  x?: number;
-  y?: number;
   scene?: Phaser.Scene;
+  rect?: Phaser.GameObjects.Rectangle;
+  speed?: number;
   constructor(scene: Phaser.Scene, x: number, y: number) {
-    this.x = x;
-    this.y = y;
     this.scene = scene;
-    this.scene.add.rectangle(x, y, 50, 50, 0xffffff);
+    this.rect = this.scene.add.rectangle(x, y, 50, 50, 0xffffff);
+    this.scene.physics.add.existing(this.rect);
+    this.speed = Math.random() * 0.3;
   }
   update(_timeMs: number, delta: number) {
-    this.x! += delta * 0.5;
+    this.rect!.x += delta * this.speed!;
   }
 }
